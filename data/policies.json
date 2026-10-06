@@ -1,0 +1,27 @@
+[
+  {
+    "policy_id": "AML-001",
+    "title": "Currency Transaction Reporting Threshold",
+    "text": "Any cash transaction exceeding $10,000 in a single business day must be reported on a Currency Transaction Report (CTR). Multiple cash deposits by the same customer that individually fall below $10,000 but aggregate above it within a rolling 5-day window must be reviewed for structuring. Structuring is the deliberate splitting of transactions to evade reporting and is itself a reportable offence regardless of the source of funds."
+  },
+  {
+    "policy_id": "AML-002",
+    "title": "Unusual Volume Relative to Customer Profile",
+    "text": "Activity is considered anomalous when a customer's transaction volume in a 30-day period exceeds 5x their stated typical monthly volume. Anomalous volume alone is not sufficient grounds to escalate. The analyst must first establish whether a documented explanation exists, such as payroll bonus, tax refund, insurance settlement, property transaction or asset sale. Where the counterparty identifies such a source, the alert should be cleared."
+  },
+  {
+    "policy_id": "AML-003",
+    "title": "Sanctions and Watchlist Screening",
+    "text": "All wire counterparties must be screened against the current sanctions watchlist. A positive match is a mandatory escalation with no analyst discretion. The transaction must be held and compliance notified the same business day. Partial name matches require manual adjudication but must still be escalated."
+  },
+  {
+    "policy_id": "AML-004",
+    "title": "Circular and Layering Patterns",
+    "text": "Funds that move between three or more related accounts and return to the originating account within a 10-day window, with no apparent economic purpose, indicate layering. Layering patterns must be escalated. The absence of a commercial relationship between the accounts strengthens the case for escalation."
+  },
+  {
+    "policy_id": "AML-005",
+    "title": "Escalation Standard and Documentation",
+    "text": "An escalation decision must cite the specific policy relied upon and the specific transactions or account facts supporting it. A decision to clear an alert must likewise record the evidence relied upon. Conclusions that cannot be traced to a retrieved record are not acceptable for audit."
+  }
+]
