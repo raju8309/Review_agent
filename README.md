@@ -8,6 +8,21 @@ That second part is the point. An agent can reach the right decision for a reaso
 invented. For a bank that's a compliance failure even when the answer is correct,
 because the audit trail is fiction.
 
+## Results
+
+On 25 test cases with planted suspicious patterns:
+
+- **Decision accuracy: 100%** (25/25 correct escalate/clear decisions)
+- **Citation support rate: 95%** (69/73 claims backed by the cited record)
+
+Example of a broken citation caught by the verifier:
+
+> Claim: "Each cash deposit is between $9,000 and $10,000."
+> Cited: S1 (customer profile)
+> Verdict: WRONG_SOURCE — the facts are in S4 (transaction history), not S1
+
+The decision was correct (escalate for structuring), but the audit trail is broken — the agent cited the wrong source. A bank auditor would reject this case.
+
 ## What it does
 
 1. An alert comes in on a suspicious transaction.
