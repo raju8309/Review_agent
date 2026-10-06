@@ -15,7 +15,7 @@ from typing import Any, Optional
 from .tools import Tools, EvidenceLog, TOOL_SPECS
 
 MODEL = os.getenv("MODEL", "claude-sonnet-4-5")
-MAX_TURNS = 10
+MAX_TURNS = 15
 
 SYSTEM = """You are an AML analyst agent at a bank. You investigate a flagged \
 transaction and decide whether to ESCALATE it to compliance or CLEAR it.
@@ -152,6 +152,26 @@ def _mock_investigate(alert: dict, tools: Tools, log: EvidenceLog) -> dict:
     benign_markers = ("PAYROLL", "TAX REF", "ESCROW", "INSURANCE", "TUITION", "DEALER")
     looks_benign = any(m in t["counterparty"].upper() for m in benign_markers)
 
+    # Check for structuring: repeated cash deposits just under $10k
+    cash_deposits = [tr for tr in hist["transactions"]
+                     if tr["direction"] == "in" and tr["channel"] == "cash"]
+    looks_like_structuring = (len(cash_deposits) >= 4 and
+                              all(9000 <= tr["amount"] <= 10000 for tr in cash_deposits))
+
+    if looks_like_structuring:
+        pol = tools.search_policy("currency transaction reporting threshold structuring")
+        claims = [
+            {"claim": f"The customer made {len(cash_deposits)} cash deposits in the 30-day window.",
+             "source_id": hist["source_id"]},
+            {"claim": "Each cash deposit is between $9,000 and $10,000.",
+             "source_id": cust["source_id"]},  # Wrong source for testing the verifier
+            {"claim": "Policy requires escalation for structuring to evade reporting thresholds.",
+             "source_id": pol["source_id"]},
+        ]
+        case = {"decision": "escalate", "policy_cited": "AML-001", "claims": claims,
+                "summary": "Multiple cash deposits just under $10,000 indicate structuring."}
+        return {"case": case, "evidence": log.as_list(), "turns": 4}
+
     pol = tools.search_policy("unusual volume relative to customer profile explanation")
     claims = [
         {"claim": f"The customer's stated typical monthly volume is ${baseline:,}.",
@@ -159,7 +179,7 @@ def _mock_investigate(alert: dict, tools: Tools, log: EvidenceLog) -> dict:
         {"claim": f"Activity in the 30 days to {alert['raised_on']} totalled "
                   f"${moved:,.2f}.", "source_id": hist["source_id"]},
         {"claim": f"The counterparty on the flagged transaction is {t['counterparty']}.",
-         "source_id": hist["source_id"]},   # deliberately the wrong source
+         "source_id": hist["source_id"]},   # deliberately the wrong source for testing
     ]
 
     if looks_benign:
