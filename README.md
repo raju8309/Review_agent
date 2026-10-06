@@ -1,5 +1,7 @@
 # Case Review Agent
 
+![Screenshot](screenshot.png)
+
 An AI agent that investigates flagged bank transactions, decides whether to escalate
 or clear them, and writes up its reasoning — plus an eval harness that checks whether
 its reasoning actually matches the records it looked at.
