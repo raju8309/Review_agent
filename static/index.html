@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Case Review Queue</title>
+<style>
+  :root{
+    --bg:#f7f7f6; --panel:#fff; --line:#e3e2df; --ink:#1c1b19; --mut:#6b6a66;
+    --esc:#b4312a; --clr:#1f7a4d; --warn:#9a6a00;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+       background:var(--bg);color:var(--ink)}
+  header{padding:14px 20px;border-bottom:1px solid var(--line);background:var(--panel);
+         display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
+  header h1{font-size:15px;margin:0;font-weight:600}
+  .stats{color:var(--mut);font-size:12.5px}
+  .stats b{color:var(--ink)}
+  .wrap{display:grid;grid-template-columns:300px 1fr;height:calc(100vh - 53px)}
+  .queue{border-right:1px solid var(--line);overflow:auto;background:var(--panel)}
+  .q{padding:10px 14px;border-bottom:1px solid var(--line);cursor:pointer}
+  .q:hover{background:#fafaf9}
+  .q.on{background:#eef2f7;box-shadow:inset 3px 0 0 #2f5d9e}
+  .q .id{font-weight:600;font-size:13px}
+  .q .meta{color:var(--mut);font-size:12px;margin-top:2px}
+  .pat{display:inline-block;font-size:10.5px;letter-spacing:.04em;padding:1px 6px;
+       border-radius:3px;background:#edecea;color:var(--mut);margin-left:6px}
+  .done{font-size:11px;color:var(--clr)}
+  main{overflow:auto;padding:22px 26px}
+  .empty{color:var(--mut);padding:40px 0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:7px;
+        padding:16px 18px;margin-bottom:16px}
+  .card h2{font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--mut);
+           margin:0 0 10px;font-weight:600}
+  .verdict{display:inline-block;font-weight:600;font-size:13px;padding:3px 10px;
+           border-radius:4px;color:#fff}
+  .escalate{background:var(--esc)} .clear{background:var(--clr)}
+  .sum{margin-top:10px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  td,th{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut);font-weight:600}
+  .tag{font-size:10.5px;font-weight:600;padding:1px 6px;border-radius:3px;white-space:nowrap}
+  .SUPPORTED{background:#e4f3ea;color:var(--clr)}
+  .WRONG_SOURCE{background:#fdf0da;color:var(--warn)}
+  .UNSUPPORTED{background:#fbe6e4;color:var(--esc)}
+  .NOT_CHECKABLE{background:#eeedeb;color:var(--mut)}
+  .src{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:#2f5d9e;
+       cursor:pointer;text-decoration:underline dotted}
+  pre{background:#faf9f7;border:1px solid var(--line);border-radius:5px;padding:10px;
+      overflow:auto;font-size:11.5px;margin:6px 0 0;max-height:280px}
+  .note{color:var(--mut);font-size:12px;margin-top:3px}
+  .btns{display:flex;gap:8px;margin-top:4px}
+  button{font:inherit;padding:7px 15px;border-radius:5px;border:1px solid var(--line);
+         background:var(--panel);cursor:pointer}
+  button.pri{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .ok{color:var(--clr);font-size:13px;margin-top:8px}
+  details summary{cursor:pointer;color:var(--mut);font-size:12.5px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Case Review Queue</h1>
+  <div class="stats" id="stats"></div>
+</header>
+
+<div class="wrap">
+  <div class="queue" id="queue"></div>
+  <main id="main"><div class="empty">Select an alert to see the agent's case file.</div></main>
+</div>
+
+<script>
+let items = [], current = null;
+
+async function boot(){
+  items = await (await fetch('/api/queue')).json();
+  renderQueue();
+  const s = await (await fetch('/api/stats')).json();
+  document.getElementById('stats').innerHTML = s.ran
+    ? `eval: <b>${(s.decision_accuracy*100).toFixed(0)}%</b> decisions correct ·
+       <b>${(s.citation_support_rate*100).toFixed(0)}%</b> of ${s.claims_checked} citations supported`
+    : 'run <code>python -m evals.run_eval --mock</code> to see eval numbers';
+}
+
+function renderQueue(){
+  document.getElementById('queue').innerHTML = items.map(i => `
+    <div class="q ${current===i.transaction_id?'on':''}" onclick="open_('${i.transaction_id}')">
+      <div class="id">${i.alert.alert_id}</div>
+      <div class="meta">
+        $${i.alert.transaction.amount.toLocaleString()} ·
+        ${i.alert.transaction.counterparty.slice(0,22)}
+        <span class="pat">${i.pattern}</span>
+      </div>
+      ${i.reviewed ? `<div class="done">✓ ${i.analyst_action}</div>` : ''}
+    </div>`).join('');
+}
+
+async function open_(tid){
+  current = tid; renderQueue();
+  document.getElementById('main').innerHTML = '<div class="empty">Investigating…</div>';
+  const d = await (await fetch('/api/case/'+tid)).json();
+  render(d);
+}
+
+function render(d){
+  const c = d.case || {};
+  const v = d.verification || {};
+  const t = d.alert.transaction;
+  const rate = v.support_rate==null ? '—' : (v.support_rate*100).toFixed(0)+'%';
+
+  document.getElementById('main').innerHTML = `
+    <div class="card">
+      <h2>Alert</h2>
+      <table>
+        <tr><th>Transaction</th><td>${t.transaction_id}</td>
+            <th>Amount</th><td>$${t.amount.toLocaleString()}</td></tr>
+        <tr><th>Customer</th><td>${t.customer_id}</td>
+            <th>Date</th><td>${t.date}</td></tr>
+        <tr><th>Counterparty</th><td>${t.counterparty}</td>
+            <th>Channel</th><td>${t.channel} (${t.direction})</td></tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>Agent decision</h2>
+      <span class="verdict ${c.decision}">${(c.decision||'—').toUpperCase()}</span>
+      <span style="margin-left:10px;color:var(--mut)">policy ${c.policy_cited||'—'} ·
+        ${d.turns} turns · citations supported ${rate}</span>
+      <div class="sum">${c.summary||''}</div>
+    </div>
+
+    <div class="card">
+      <h2>Claims and their sources</h2>
+      <table>
+        <tr><th>Claim</th><th>Source</th><th>Check</th></tr>
+        ${(v.details||[]).map(x=>`
+          <tr>
+            <td>${x.claim}${x.note?`<div class="note">${x.note}</div>`:''}</td>
+            <td><span class="src" onclick="showSrc('${x.cited}')">${x.cited||'—'}</span></td>
+            <td><span class="tag ${x.verdict}">${x.verdict.replace('_',' ')}</span></td>
+          </tr>`).join('')}
+      </table>
+      <div id="srcbox"></div>
+    </div>
+
+    <div class="card">
+      <h2>What the agent looked at</h2>
+      ${d.evidence.map(e=>`
+        <details><summary>${e.source_id} — ${e.tool}(${JSON.stringify(e.args)})</summary>
+        <pre>${JSON.stringify(e.result,null,2).slice(0,4000)}</pre></details>`).join('')}
+    </div>
+
+    <div class="card">
+      <h2>Analyst decision</h2>
+      <div class="btns">
+        <button class="pri" onclick="review('${d.transaction_id}','approve')">Approve agent's call</button>
+        <button onclick="review('${d.transaction_id}','reject')">Reject and handle manually</button>
+      </div>
+      <div class="ok" id="ok"></div>
+    </div>`;
+  window._ev = d.evidence;
+}
+
+function showSrc(sid){
+  const e = (window._ev||[]).find(x=>x.source_id===sid);
+  document.getElementById('srcbox').innerHTML = e
+    ? `<pre>${JSON.stringify(e.result,null,2).slice(0,4000)}</pre>`
+    : `<div class="note">No record with id ${sid} was ever returned by a tool.</div>`;
+}
+
+async function review(tid, action){
+  await fetch('/api/review',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({transaction_id:tid,action,note:''})});
+  document.getElementById('ok').textContent = 'Recorded: '+action;
+  items = await (await fetch('/api/queue')).json();
+  renderQueue();
+}
+
+boot();
+</script>
+</body>
+</html>
